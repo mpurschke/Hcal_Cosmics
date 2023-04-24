@@ -11,6 +11,9 @@
 
 #include "HCal_Cosmics.h"
 
+#include "hCalChannelmap.h"
+
+
 #include <fun4all/Fun4AllReturnCodes.h>
 
 #include <phool/PHCompositeNode.h>
@@ -75,6 +78,10 @@ HCal_Cosmics::HCal_Cosmics(const std::string &name, const std::string &combined
   h2_packet_vs_event->GetXaxis()->SetTitle("Event Nr");
   h2_packet_vs_event->GetYaxis()->SetTitle("Packets found");
 
+
+  hcalHist = new TH2F("hcalHist", "hcalHist",
+                      24, eta_start, eta_end,    // 24 eta bins
+                      64, -1*pi , pi);           // 32 sectors in two phi rows = 64 phi bins
 
 
   _combined_filename = combined;
@@ -181,7 +188,8 @@ int HCal_Cosmics::process_event(PHCompositeNode *topNode)
   
   if ( min_depth >= 100)
     {
-      process();
+      int status = process();
+      if (status) return status;
     }
 
   return Fun4AllReturnCodes::EVENT_OK;
@@ -311,8 +319,7 @@ int HCal_Cosmics::process(const unsigned int min_depth)
 
       h2_packet_vs_event->Fill(current_evtnr, aligned_packets.size() );
       // this is the place where we call the analysis
-      //      int status = Analysis();
-      Analysis(aligned_packets);
+      int status = Analysis(aligned_packets);
 
       auto it = aligned_packets.begin();
       for ( ; it != aligned_packets.end(); ++it)
@@ -321,6 +328,11 @@ int HCal_Cosmics::process(const unsigned int min_depth)
 	}
 
       current_evtnr++;
+      if (status) 
+	{
+	  cout << "trigger!" << endl;
+	  //return status;
+	}
     }
   return 0;
 }
@@ -385,6 +397,11 @@ int HCal_Cosmics::Analysis(std::vector<Packet *> & aligned_packets)
     }
   h1_hival_count->Fill(highval_count);  
 
+  if ( highval_count >=2) 
+    {
+      fillHist(aligned_packets);
+      return Fun4AllReturnCodes::ABORTRUN;
+    }
   return 0;
 
 }
@@ -441,7 +458,7 @@ int HCal_Cosmics::Reset(PHCompositeNode *topNode)
 void HCal_Cosmics::Print(const std::string &what) const
 {
 
-  // here we ad a spy probe to give some info about our various containers
+  // here we add a spy probe to give some info about our various containers
 
   auto itr = packet_pool.begin();
 
@@ -456,3 +473,59 @@ void HCal_Cosmics::Print(const std::string &what) const
 
   //std::cout << "HCal_Cosmics::Print(const std::string &what) const Printing info for " << what << std::endl;
 }
+
+
+
+int HCal_Cosmics::fillHist(std::vector<Packet *> & aligned_packets)
+{
+  hcalHist->Reset();
+  double signal_threshold = 1000;
+
+  auto it = aligned_packets.begin();
+  for ( ; it != aligned_packets.end(); ++it)
+    {
+      Packet *p = *it;  // easier to remember what is what
+      if ( p->getIdentifier() < 8000) continue; // only Outer HCal for now
+      
+      int sector = p->getIdentifier() - 8001;
+      for ( int slice = 0; slice < 4; slice ++) // the 4 slices of a sector
+	{
+	  int ch = slice *48;
+	  
+          for  ( int c  = 0; c  < 48; c ++)   // we go through 48 channels
+            {
+              
+	      int ccc = c + ch;
+
+              double baseline = 0.;           // calculate the baseline from the last 3 bins
+              for ( int s = p->iValue(0,"SAMPLES")-3;  s <p->iValue(0,"SAMPLES"); s++)
+                {
+                  baseline += p->iValue(s,ccc);
+                }
+              baseline /= 3.;
+
+              
+              double signal = 0;               // we integrate the other samples              
+              for ( int s = 0;  s< p->iValue(0,"SAMPLES") -3; s++)
+                {
+                  signal += ( p->iValue(s,ccc) - baseline);
+                }
+              if (signal < signal_threshold ) signal = 0;
+              
+              double phi = -1*pi + (4*sector + slice + hcal_phybin[c] + 0.5) * 2*pi /64.;  // sector rotates 2 phy bins 
+              
+              double etabin = eta_start + eta_range / 24. * (hcal_etabin[c]+0.5);
+              
+              cout << "ch, signal, eta, phi " << c << " " << signal << " " << etabin << " " << phi << endl;
+              
+              hcalHist->Fill ( etabin, phi, signal);
+              //hcalHist->Fill ( etabin, phi);
+              
+              
+            }
+          
+        }
+    }
+  return 0;
+}
+

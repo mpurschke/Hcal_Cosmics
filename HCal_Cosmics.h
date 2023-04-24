@@ -10,6 +10,7 @@
 #include <set>
 #include <tuple>
 
+#include <math.h>
 
 #include <fun4all/Fun4AllServer.h>
 #include <Event/fileEventiterator.h>
@@ -71,6 +72,7 @@ class HCal_Cosmics : public SubsysReco
   unsigned int getMinDepth() const;
 
   int Analysis(std::vector<Packet *> &);
+  int fillHist(std::vector<Packet *> &);
 
   Fun4AllServer *se;
 
@@ -103,7 +105,12 @@ class HCal_Cosmics : public SubsysReco
   TH2F * h2_packet_vs_event;
   TH1F *h1_hival;
   TH1F *h1_hival_count;
+  TH2F *hcalHist;
 
+  const double pi = 4. * atan2(1.,1.);
+  const double eta_start = -1. * ( 90-36.82) *pi/180.;
+  const double eta_end = ( 90-36.82) *pi/180.;
+  const double eta_range = ( 90-36.82) *pi/90.;
 
 };
 
