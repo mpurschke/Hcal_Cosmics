@@ -19,3 +19,4 @@ run.C gives you a pointer "s" to the class, so s->Verbosity(0) will make it quie
 To do:
 - there are a number of hard-coded thresholds etc in there, make them configurable
 - add the code to write out the events that have been aligned, or flagged as complete, or otherwise selected
+- the fillHist that tries to fill the histogram for the event display needs some TLC - the mapping is likely still wrong
