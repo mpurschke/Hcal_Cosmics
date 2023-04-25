@@ -6,6 +6,7 @@ Run it like this (and adjust run.C to your realities/wishes):
 $ root -l run.C
 
 root [2] Fun4AllServer *se = Fun4AllServer::instance();
+
 root [3] se->run(102)
 
 
